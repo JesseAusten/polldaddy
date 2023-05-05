@@ -43,24 +43,28 @@ def vote_once(form, value):
     send = c.get(request, headers=hdrs, verify=False, proxies=px)
 
     print(send.url)
+    return "revoted" not in send.url
 
 def vote(form, value, times, wait_min = None, wait_max = None):
     global redirect
     # For each voting attempt
     i = 1
     while i < times+1:
-        b = vote_once(form, value)
-        # If successful, print that out, else try waiting for 60 seconds (rate limiting)
-        if not b:
+
+        # Vote once, False means it counted as a revote
+        if vote_once(form, value):
+            print(f"\nVoted {i} times!\n")
+            if i == times:
+                break
+
             # Randomize timing if set
             if wait_min and wait_max:
                 seconds = random.randint(wait_min, wait_max)
             else:
                 seconds = 3
-
-            print("\nVoted (time number " + str(i) + ")!\n")
             time.sleep(seconds)
         else:
+            # Failed
             i-=1
             time.sleep(60)
         i += 1
@@ -76,6 +80,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', help='number of times to vote', type=int, required=True)
+    parser.add_argument('--min', help='min seconds to wait between votes', type=int, required=False)
+    parser.add_argument('--max', help='max seconds to wait between votes', type=int, required=False)
 
     args = parser.parse_args()
-    vote(poll_id, answer_id, args.n, None, None)
+    vote(poll_id, answer_id, args.n, args.min, args.max)
