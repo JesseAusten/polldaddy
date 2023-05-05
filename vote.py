@@ -4,7 +4,7 @@ import requests, re, json, time, random
 import argparse
 requests.packages.urllib3.disable_warnings()
 
-base_url = 'https://polldaddy.com/poll/'
+base_url = 'https://poll.fm/'
 poll_id = 12224023
 answer_id = 55428209
 useragents = []
@@ -23,12 +23,13 @@ def vote_once(form, value):
     c = requests.Session()
     ua = choose_useragent()
     px = choose_proxy()
+    c.proxies=px
     print(f'{ua=}')
     print(f'{px=}')
     hdrs = {"Referer": base_url + str(form) + "/", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8", "User-Agent": ua, "Upgrade-Insecure-Requests":"1", "Accept-Encoding": "gzip, deflate, sdch", "Accept-Language": "en-US,en;q=0.8"}
 
     url = base_url + str(form) + "/"
-    resp = c.get(url, headers=hdrs, verify=False, proxies=px)
+    resp = c.get(url, headers=hdrs, verify=False)
 
     # Contains variables
     data = re.search("data-vote=\"(.*?)\"",resp.text).group(1).replace('&quot;','"')
@@ -40,7 +41,7 @@ def vote_once(form, value):
     # Build the GET url to vote
     request = "https://poll.fm/vote?va=" + str(data['at']) + "&pt=0&r=0&p=" + str(form) + "&a=" + str(value) + "%2C&o=&t=" + str(data['t']) + "&token=" + str(data['n']) + "&pz=" + str(pz)
     print(f'Sending request: {request}')
-    send = c.get(request, headers=hdrs, verify=False, proxies=px)
+    send = c.get(request, headers=hdrs, verify=False)
 
     print(send.url)
     return "revoted" not in send.url
