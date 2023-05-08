@@ -60,10 +60,13 @@ def vote_once(form, value):
 
 def vote(form, value, times, wait_min = None, wait_max = None):
     for i in range(times):
-        while vote_once(form, value) is False:
+        try:
+            while vote_once(form, value) is False:
+                time.sleep(random.randint(30, 60))
+        except:
             time.sleep(random.randint(30, 60))
 
-        print(f"Voted {i+1} times!")
+        print(f"Voted {i+1}/{times} times!")
 
         # Randomize timing if set
         if wait_min and wait_max:
@@ -92,6 +95,7 @@ if __name__ == '__main__':
         vote(poll_id, answer_id, args.n, args.min, args.max)
         exit(0)
 
+    last_diff = 0
     while True:
         other_votes = -1
         our_votes = -1
@@ -118,11 +122,19 @@ if __name__ == '__main__':
         print(f"{other_votes=}")
         print(f"{our_votes=}")
 
-        if other_votes > our_votes + 500:
-            diff = other_votes - our_votes
-            nvotes = random.randint(diff+500, diff+1000)
-            print(f'Diff is {diff}, voting {nvotes} times')
-            vote(poll_id, answer_id, nvotes, args.min, args.max)
+        if our_votes < int(other_votes*1.2):
+            diff = int(other_votes*1.2) - our_votes
+            nvotes = random.randint(diff, diff+int(other_votes*0.1))
+            print(f'Diff (x1.2) is {diff}, voting {nvotes} times')
+
+            min = args.min
+            max = args.max
+            if our_votes < int(other_votes*1.05):
+                # overdrive mode
+                print('Engaging lightspeed')
+                min = 2
+                max = 4
+            vote(poll_id, answer_id, nvotes, min, max)
 
 
         time.sleep(10 + random.randint(0, 20))
