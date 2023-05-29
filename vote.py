@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 requests.packages.urllib3.disable_warnings()
 
 base_url = 'https://poll.fm/'
-poll_id = 12224023
-answer_id = 55428209
+poll_id = 12310670
+answer_id = 55742905
 useragents = []
 proxies = []
 
