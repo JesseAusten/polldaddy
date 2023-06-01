@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 requests.packages.urllib3.disable_warnings()
 
 base_url = 'https://poll.fm/'
-poll_id = 12310670
-answer_id = 55742905
+poll_id = 12348499
+answer_id = 55877168
 useragents = []
 proxies = []
 
@@ -110,7 +110,7 @@ if __name__ == '__main__':
             nvotes_lst = re.findall("([0-9,]*) votes", nvotes_str)
             if len(nvotes_lst) > 0:
                 nvotes = int(nvotes_lst[0].replace(',', ''))
-                if nvotes < 0 or nvotes > 100000:
+                if nvotes < 0 or nvotes > 10000000:
                     nvotes = -1
             if '(9)' in result.find('span', attrs={'class':'pds-answer-text'}).string:
                 if nvotes > 0:
