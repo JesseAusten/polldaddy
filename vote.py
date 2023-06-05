@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 
-import requests, re, json, time, random
+import requests, re, json, time, random, datetime
+import asyncio
+from proxybroker import Broker, ProxyPool
+from proxybroker.errors import NoProxyError
+from signal import SIGINT, SIGTERM
 import argparse
 from bs4 import BeautifulSoup
 requests.packages.urllib3.disable_warnings()
@@ -11,29 +15,26 @@ answer_id = 55877168
 useragents = []
 proxies = []
 
-
 def choose_useragent():
     k = random.randint(0, len(useragents)-1)
     return useragents[k]
 
-def choose_proxy():
-    k = random.randint(0, len(proxies)-1)
-    return {"http:", proxies[k]}
-
-def vote_once(form, value):
+def vote_once(proxy, form, value):
+    print(f'Using proxy {proxy}')
     c = requests.Session()
-    ua = choose_useragent()
-    px = choose_proxy()
-    c.proxies=px
-    # print(f'{ua=}')
-    # print(f'{px=}')
-    hdrs = {"Referer": base_url + str(form) + "/", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8", "User-Agent": ua, "Upgrade-Insecure-Requests":"1", "Accept-Encoding": "gzip, deflate, sdch", "Accept-Language": "en-US,en;q=0.8"}
+    c.proxies={'https': f'{proxy.host}:{proxy.port}'}
 
+    ua = choose_useragent()
+    hdrs = {"Referer": base_url + str(form) + "/", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8", "User-Agent": ua, "Upgrade-Insecure-Requests":"1", "Accept-Encoding": "gzip, deflate, sdch", "Accept-Language": "en-US,en;q=0.8"}
     url = base_url + str(form)
+
     try:
-        resp = c.get(url, headers=hdrs, timeout=5)
+        print(f'request with proxies: {c.proxies}')
+        resp = c.get(url, headers=hdrs, timeout=2)
+        print(f'resp: {resp}')
     except requests.exceptions.ConnectTimeout:
         print('Timed out')
+        c.close()
         return False
 
     # Contains variables
@@ -45,12 +46,16 @@ def vote_once(form, value):
 
     # Build the GET url to vote
     request = "https://poll.fm/vote?va=" + str(data['at']) + "&pt=0&r=0&p=" + str(form) + "&a=" + str(value) + "%2C&o=&t=" + str(data['t']) + "&token=" + str(data['n']) + "&pz=" + str(pz)
-    # print(f'Sending request: {request}')
+    print(f'Sending request: {request}')
     try:
-        send = c.get(request, headers=hdrs, verify=False, timeout=5)
+        print(f'proxies: {c.proxies}')
+        send = c.get(request, headers=hdrs, timeout=2)
     except requests.exceptions.ConnectTimeout:
         print('Timed out 2')
+        c.close()
         return False
+    
+    c.close()
 
     if "revoted" in send.url:
         print('Counted as revote')
@@ -58,43 +63,53 @@ def vote_once(form, value):
     else:
         return True
 
-def vote(form, value, times, wait_min = None, wait_max = None):
+async def vote(proxies, form, value, times, wait_min = None, wait_max = None):
+    print('proxy gathering done')
     for i in range(times):
+        start = datetime.datetime.now()
+
+        res = False
         try:
-            while vote_once(form, value) is False:
-                time.sleep(random.randint(30, 60))
+            print('await start')
+            proxy = await proxies.get()
+            print('await done')
+            if proxy is not None:
+                res = vote_once(proxy, form, value)
         except:
             time.sleep(random.randint(30, 60))
 
-        print(f"Voted {i+1}/{times} times!")
+        if res:
+            print(f"Voted {i+1}/{times} times!")
+        else:
+            print('Failed to vote')
 
         # Randomize timing if set
         if wait_min and wait_max:
             seconds = random.randint(wait_min, wait_max)
         else:
-            seconds = 3
-        time.sleep(seconds)
+            seconds = 5
+
+        end = datetime.datetime.now()
+        seconds -= (end - start).total_seconds()
+        if (seconds > 0):
+            print(f'Sleeping for {seconds} seconds')
+            time.sleep(seconds)
+
 
 if __name__ == '__main__':
 
     with open('useragent.txt', 'r') as f:
         for line in f:
             useragents.append(line.rstrip('\n').rstrip('\r'))
-    with open('proxy.txt', 'r') as f:
-        for line in f:
-            proxies.append(line.rstrip('\n').rstrip('\r'))
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-n', help='number of times to vote, only used if not monitoring votes', type=int, required=False)
-    parser.add_argument('--min', help='min seconds to wait between votes', type=int, required=False)
-    parser.add_argument('--max', help='max seconds to wait between votes', type=int, required=False)
+    types = ['HTTPS']
+    countries = ['US', 'CA', 'DE', 'FR', 'GB', 'MX']
+    
+    # Add signal handlers to cancel loop
+    # loop.add_signal_handler(SIGINT, tasks.cancel)
+    # loop.add_signal_handler(SIGTERM, tasks.cancel)
 
-    args = parser.parse_args()
-
-    if args.n:
-        vote(poll_id, answer_id, args.n, args.min, args.max)
-        exit(0)
-
+    # Run until cancelled
     last_diff = 0
     while True:
         other_votes = -1
@@ -125,16 +140,25 @@ if __name__ == '__main__':
         if our_votes < int(other_votes*1.2):
             diff = int(other_votes*1.2) - our_votes
             nvotes = random.randint(diff, diff+int(other_votes*0.1))
+            if nvotes > 100:
+                nvotes = 100
             print(f'Diff (x1.2) is {diff}, voting {nvotes} times')
 
-            min = args.min
-            max = args.max
+            min = None
+            max = None
             if our_votes < int(other_votes*1.05):
                 # overdrive mode
                 print('Engaging lightspeed')
                 min = 2
                 max = 4
-            vote(poll_id, answer_id, nvotes, min, max)
+            print('Starting tasks')
 
+            proxies = asyncio.Queue()
+            broker = Broker(proxies, verify_ssl=False)
 
-        time.sleep(10 + random.randint(0, 20))
+            tasks = asyncio.gather(
+                broker.find(types=types, countries=countries, limit=nvotes),
+                vote(proxies, poll_id, answer_id, nvotes, min, max))
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(tasks)
+    
