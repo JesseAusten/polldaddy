@@ -74,6 +74,7 @@ async def vote(proxies, form, value, times, wait_min = None, wait_max = None):
             print(f"Voted {i+1}/{times} times!")
         else:
             print('Failed to vote')
+            time.sleep(random.randint(30, 60))
 
         # Randomize timing if set
         if wait_min and wait_max:
