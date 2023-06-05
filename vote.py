@@ -20,7 +20,6 @@ def choose_useragent():
     return useragents[k]
 
 def vote_once(proxy, form, value):
-    print(f'Using proxy {proxy}')
     c = requests.Session()
     c.proxies={'https': f'{proxy.host}:{proxy.port}'}
 
@@ -29,9 +28,7 @@ def vote_once(proxy, form, value):
     url = base_url + str(form)
 
     try:
-        print(f'request with proxies: {c.proxies}')
         resp = c.get(url, headers=hdrs, timeout=2)
-        print(f'resp: {resp}')
     except requests.exceptions.ConnectTimeout:
         print('Timed out')
         c.close()
@@ -46,9 +43,7 @@ def vote_once(proxy, form, value):
 
     # Build the GET url to vote
     request = "https://poll.fm/vote?va=" + str(data['at']) + "&pt=0&r=0&p=" + str(form) + "&a=" + str(value) + "%2C&o=&t=" + str(data['t']) + "&token=" + str(data['n']) + "&pz=" + str(pz)
-    print(f'Sending request: {request}')
     try:
-        print(f'proxies: {c.proxies}')
         send = c.get(request, headers=hdrs, timeout=2)
     except requests.exceptions.ConnectTimeout:
         print('Timed out 2')
@@ -64,15 +59,12 @@ def vote_once(proxy, form, value):
         return True
 
 async def vote(proxies, form, value, times, wait_min = None, wait_max = None):
-    print('proxy gathering done')
     for i in range(times):
         start = datetime.datetime.now()
 
         res = False
         try:
-            print('await start')
             proxy = await proxies.get()
-            print('await done')
             if proxy is not None:
                 res = vote_once(proxy, form, value)
         except:
@@ -92,7 +84,6 @@ async def vote(proxies, form, value, times, wait_min = None, wait_max = None):
         end = datetime.datetime.now()
         seconds -= (end - start).total_seconds()
         if (seconds > 0):
-            print(f'Sleeping for {seconds} seconds')
             time.sleep(seconds)
 
 
@@ -151,7 +142,6 @@ if __name__ == '__main__':
                 print('Engaging lightspeed')
                 min = 2
                 max = 4
-            print('Starting tasks')
 
             proxies = asyncio.Queue()
             broker = Broker(proxies, verify_ssl=False)
